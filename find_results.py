@@ -48,13 +48,6 @@ class FindInFilesOpenAllFilesCommand(sublime_plugin.TextCommand):
         return [match.group(1) for match in re.finditer(r"^([^\s].+):$", content, re.MULTILINE)]
 
 
-class FindInFilesJumpFileCommand(sublime_plugin.TextCommand):
-    def run(self, edit, forward=True):
-        v = self.view
-        files = v.find_by_selector("entity.name.filename.find-in-files")
-        caret = v.sel()[0]
-
-
 class FindInFilesJumpCommand(sublime_plugin.TextCommand):
     def run(self, edit, forward=True, cycle=True):
         caret = self.view.sel()[0]
