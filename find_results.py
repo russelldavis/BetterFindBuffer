@@ -3,6 +3,31 @@ import sublime_plugin
 import re, os, shutil
 
 
+# From https://forum.sublimetext.com/t/save-find-results-and-reopen-them-with-syntax-highlight/41172/2
+class FindResultsExtensionListener(sublime_plugin.EventListener):
+    def on_load(self, view):
+        if view.file_name().endswith(".find-results"):
+            view.assign_syntax("Packages/Default/Find Results.hidden-tmLanguage")
+            # With BetterFindBuffer, the stuff below is unnecessary.
+            # It also makes it a no-op -- you can't change the regex at all, because the
+            # patterns are now hardcoded in the syntax file.
+
+            # view.settings().set("result_file_regex", r'^(?![0-9]+[:-])(.+)$')
+            # view.settings().set("result_line_regex", r"^([0-9]+):")
+            # # view.settings().set("result_file_regex", r'^([^ \t].*):$')
+            # # view.settings().set("result_line_regex", r"^ +([0-9]+):")
+
+            # # In order for the regex options to take effect, another view needs
+            # # to be given the focus temporarily.
+            # view.window().new_file()
+            # view.window().run_command("close_file")
+            # view.window().focus_view(view)
+
+
+# This replicates sublime's builtin next_result and prev_result commands (f4 / shift+f4).
+# Unlike the builtin commands, this one will work with results buffers that have been manually
+# loaded, usually with the help of FindResultsExtensionListener (rather than the ones that get
+# opened automatically from a find-in-files).
 class FindInFilesGlobalJumpMatchCommand(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
