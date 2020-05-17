@@ -3,6 +3,30 @@ import sublime_plugin
 import re, os, shutil
 
 
+class FindInFilesGlobalJumpMatchCommand(sublime_plugin.WindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+        self.current_find_view = None
+
+    def run(self, forward=True, cycle=True):
+        active_view = self.window.active_view()
+        if active_view.settings().get('syntax') == 'Packages/Default/Find Results.hidden-tmLanguage':
+            self.current_find_view = active_view
+
+        if self.current_find_view is None:
+            active_view.show_popup("No find results are loaded")
+            return
+
+        settings = self.current_find_view.settings()
+        current_point = settings.get("current_find_result_point") or 0
+        sel = self.current_find_view.sel()
+        sel.clear()
+        sel.add(sublime.Region(current_point, current_point))
+        self.current_find_view.run_command("find_in_files_jump_file", {"forward": forward, "cycle": cycle})
+        settings.set("current_find_result_point", sel[0].begin())
+        self.current_find_view.run_command("find_in_files_open_file")
+
+
 class FindInFilesOpenFileCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         view = self.view
