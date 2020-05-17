@@ -2,6 +2,7 @@ import sublime
 import sublime_plugin
 import re, os, shutil
 
+
 class FindInFilesOpenFileCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         view = self.view
@@ -48,46 +49,53 @@ class FindInFilesOpenAllFilesCommand(sublime_plugin.TextCommand):
         return [match.group(1) for match in re.finditer(r"^([^\s].+):$", content, re.MULTILINE)]
 
 
+
+def select_match(view, match):
+    sel = view.sel()
+    sel.clear()
+    sel.add(match)
+    if view.is_folded(sel[0]):
+        view.unfold(sel[0])
+
+def process_matches(view, from_point, matches, forward=True, cycle=True):
+    matches = filter_matches(view, from_point, matches)
+    if forward:
+        return find_next_match(from_point, matches, cycle)
+    else:
+        return find_prev_match(from_point, matches, cycle)
+
+def filter_matches(view, from_point, matches):
+    footers = view.find_by_selector('footer.find-in-files')
+    lower_bound = next((f.end() for f in reversed(footers) if f.end() < from_point), 0)
+    upper_bound = next((f.end() for f in footers if f.end() > from_point), view.size())
+    return [m for m in matches if m.begin() > lower_bound and m.begin() < upper_bound]
+
+def find_next_match(from_point, matches, cycle):
+    default = matches[0] if cycle and len(matches) else None
+    return next((m for m in matches if from_point < m.begin()), default)
+
+def find_prev_match(from_point, matches, cycle):
+    default = matches[-1] if cycle and len(matches) else None
+    return next((m for m in reversed(matches) if from_point > m.begin()), default)
+
+
+
 class FindInFilesJumpCommand(sublime_plugin.TextCommand):
     def run(self, edit, forward=True, cycle=True):
         caret = self.view.sel()[0]
-        matches = self.filter_matches(caret, self.find_matches())
-        if forward:
-            match = self.find_next_match(caret, matches, cycle)
-        else:
-            match = self.find_prev_match(caret, matches, cycle)
+        match = process_matches(self.view, caret.begin(), self.find_matches(), forward, cycle)
         if match:
             self.goto_match(match)
-
-    def find_next_match(self, caret, matches, cycle):
-        default = matches[0] if cycle and len(matches) else None
-        return next((m for m in matches if caret.begin() < m.begin()), default)
-
-    def filter_matches(self, caret, matches):
-        footers = self.view.find_by_selector('footer.find-in-files')
-        lower_bound = next((f.end() for f in reversed(footers) if f.end() < caret.begin()), 0)
-        upper_bound = next((f.end() for f in footers if f.end() > caret.begin()), self.view.size())
-        return [m for m in matches if m.begin() > lower_bound and m.begin() < upper_bound]
-
-    def find_prev_match(self, caret, matches, cycle):
-        default = matches[-1] if cycle and len(matches) else None
-        return next((m for m in reversed(matches) if caret.begin() > m.begin()), default)
-
-    def goto_match(self, match):
-        self.view.sel().clear()
-        self.view.sel().add(match)
-        if self.view.is_folded(self.view.sel()[0]):
-            self.view.unfold(self.view.sel()[0])
 
 
 class FindInFilesJumpFileCommand(FindInFilesJumpCommand):
     def find_matches(self):
-        return self.view.find_by_selector('entity.name.filename.find-in-files')
+        return self.view.find_by_selector('constant.numeric.line-number.match.find-in-files')
 
     def goto_match(self, match):
         v = self.view
         region = sublime.Region(match.begin(), match.begin())
-        super(FindInFilesJumpFileCommand, self).goto_match(region)
+        select_match(v, region)
         top_offset = v.text_to_layout(region.begin())[1] - v.line_height()
         v.set_viewport_position((0, top_offset), True)
 
@@ -98,7 +106,7 @@ class FindInFilesJumpMatchCommand(FindInFilesJumpCommand):
 
     def goto_match(self, match):
         v = self.view
-        super(FindInFilesJumpMatchCommand, self).goto_match(match)
+        select_match(v, match)
         vx, vy = v.viewport_position()
         vw, vh = v.viewport_extent()
         x, y = v.text_to_layout(match.begin())
